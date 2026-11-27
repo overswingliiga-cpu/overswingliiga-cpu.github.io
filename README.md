@@ -1,1 +1,1 @@
-# overswingliiga-cpu.github.io
+Overswing Firmaliiga – liigan sivusto (GitHub Pages)

@@ -1,0 +1,51 @@
+{
+  "updated": "2026-11-27T10:54:45.398256+02:00",
+  "updated_fi": "27.11.2026 klo 10.54 (Suomen aikaa)",
+  "fetch_ok": true,
+  "teams": [
+    {
+      "name": "Overswing Golf",
+      "players": [
+        {
+          "first": "Janne",
+          "sgt": "MrL"
+        },
+        {
+          "first": "Samuel",
+          "sgt": "SamuKaari"
+        }
+      ]
+    },
+    {
+      "name": "Hyppösen maatila",
+      "players": [
+        {
+          "first": "Eetu",
+          "sgt": "EDOU"
+        },
+        {
+          "first": "Otto",
+          "sgt": "OttoKaariniemi"
+        }
+      ]
+    }
+  ],
+  "tournament": {
+    "id": "85603",
+    "name": "Kisa 1, Joulukuu",
+    "course": "Fox Meadow",
+    "url": "https://simulatorgolftour.com/tournament/85603",
+    "api": "https://simulatorgolftour.com/sgt-api/leaderboard/85603/net",
+    "http_status": 200,
+    "played": false,
+    "rows": []
+  },
+  "tour": {
+    "id": "4048",
+    "name": "Overswing Firmaliiga",
+    "url": "https://simulatorgolftour.com/tour/4048",
+    "http_status": 200,
+    "events": [],
+    "rows": []
+  }
+}
