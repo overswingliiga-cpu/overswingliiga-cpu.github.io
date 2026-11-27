@@ -12,10 +12,19 @@
   document.body.insertBefore(layer, document.body.firstChild);
   var ctx = canvas.getContext("2d");
   if (!ctx) return;
+  // mobiilin pieni versio yläpalkissa (näkyy vain kapeilla näytöillä, ks. site.css .golf-mini)
+  var miniCanvas = null, bar = document.querySelector(".topbar-inner");
+  if (bar) {
+    miniCanvas = document.createElement("canvas");
+    miniCanvas.className = "golf-mini";
+    miniCanvas.setAttribute("aria-hidden", "true");
+    var nav = bar.querySelector(".sitenav");
+    bar.insertBefore(miniCanvas, nav || null);
+  }
 
   var reduceMq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
   var STATIC_P = 0.64;               // pysäytyskuva: osuma, hiekkapöllähdys ja pallo ilmassa
-  var W = 0, H = 0, dpr = 1, L = null, bgCache = null;
+  var W = 0, H = 0, dpr = 1, L = null, bgCache = null, TK = 1, MINI = false;
   var cur = 0, target = 0, raf = 0;
 
   /* ---------- apufunktiot ---------- */
@@ -202,10 +211,57 @@
     c.fillStyle = "#060606"; c.fill();
   }
 
+  function layoutMini() {
+    var o = { portrait: false, mini: true };
+    o.gy = H * 0.90;
+    o.s = H * 0.60;
+    o.bx = W * 0.36;
+    o.gx = W * 0.86;
+    o.gyG = H * 0.80;
+    o.ball = [o.bx, o.gy];
+    o.land = [o.gx - W * 0.07, o.gyG + 1];
+    o.hole = [o.gx - 2, o.gyG + 1.5];
+    var peak = H * 0.10;
+    o.ctrl = [lerp(o.ball[0], o.land[0], 0.45), (peak - 0.25 * o.gy - 0.25 * o.land[1]) / 0.5];
+    o.horizon = H * 0.80;
+    return o;
+  }
+  function buildBgMini() {
+    bgCache = document.createElement("canvas");
+    bgCache.width = Math.round(W * dpr); bgCache.height = Math.round(H * dpr);
+    var c = bgCache.getContext("2d"), o = L, s = o.s;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#0a0909"); g.addColorStop(1, "#1a0c0e");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    var rg = c.createRadialGradient(o.gx, o.horizon, 0, o.gx, o.horizon, W * 0.8);
+    rg.addColorStop(0, "rgba(214,40,57,.55)"); rg.addColorStop(0.45, "rgba(214,40,57,.16)"); rg.addColorStop(1, "rgba(214,40,57,0)");
+    c.fillStyle = rg; c.fillRect(0, 0, W, H);
+    // horisontti
+    c.beginPath(); c.moveTo(0, H);
+    for (var x = 0; x <= W; x += 4) c.lineTo(x, o.horizon - 2 - 2.5 * Math.sin(x / W * 5 + 1));
+    c.lineTo(W, H); c.closePath(); c.fillStyle = "#0e0d0d"; c.fill();
+    // viheriö
+    c.beginPath(); c.ellipse(o.gx - 2, o.gyG + 1.5, W * 0.13, 2.4, 0, 0, Math.PI * 2);
+    c.fillStyle = "#1c2a22"; c.fill(); c.strokeStyle = "rgba(255,107,122,.35)"; c.lineWidth = 0.8; c.stroke();
+    // bunkkeri
+    c.beginPath(); c.ellipse(o.bx - 0.05 * s, o.gy + 1.5, W * 0.30, H * 0.12, 0, 0, Math.PI * 2);
+    var sg = c.createRadialGradient(o.bx + 6, o.gy - 2, 0, o.bx, o.gy, W * 0.3);
+    sg.addColorStop(0, "#6a5d4b"); sg.addColorStop(1, "#2a241d");
+    c.fillStyle = sg; c.fill();
+    // bunkkerin reuna lipun puolella (matala kumpare, viheriö jää näkyviin)
+    c.beginPath(); c.moveTo(o.bx + 0.40 * s, H + 1);
+    c.quadraticCurveTo(o.bx + 0.62 * s, o.gy - 0.20 * s, o.bx + 0.95 * s, o.gy - 0.10 * s);
+    c.quadraticCurveTo(o.bx + 1.25 * s, o.gy - 0.02 * s, o.bx + 1.45 * s, H + 1);
+    c.closePath();
+    c.fillStyle = "#0b0d0c"; c.fill();
+    c.strokeStyle = "rgba(255,107,122,.55)"; c.lineWidth = 0.8; c.stroke();
+  }
+
   /* ---------- dynaamiset osat ---------- */
   function toW(pt) { return [L.bx + pt[0] * L.s, L.gy + pt[1] * L.s]; }
   function limb(c, a, b, m, w) {
-    c.lineWidth = w;
+    c.lineWidth = w * TK;
     c.beginPath(); c.moveTo(a[0], a[1]);
     if (m) c.lineTo(m[0], m[1]);
     c.lineTo(b[0], b[1]); c.stroke();
@@ -237,7 +293,7 @@
     c.beginPath();
     var a1 = off(tHip), a2 = off(lHip), a3 = off(lSh), a4 = off(tSh);
     c.moveTo(a1[0], a1[1]); c.lineTo(a2[0], a2[1]); c.lineTo(a3[0], a3[1]); c.lineTo(a4[0], a4[1]); c.closePath();
-    c.lineWidth = 0.045 * s + e; c.fill(); c.stroke();
+    c.lineWidth = (0.045 * s + e) * TK; c.fill(); c.stroke();
     // kaula + pää + lippis
     limb(c, off([S[0] + 0.005, S[1]]), off(headC), null, 0.05 * s + e);
     var hc = off(headC);
@@ -246,8 +302,8 @@
     // kädet (päärenderöinnissä hento ääriviiva erottaa ne vartalosta)
     if (main) {
       c.strokeStyle = "#2c2828";
-      limb(c, off(tSh), off(hands), off(tElb), 0.05 * s + 2.2);
-      limb(c, off(lSh), off(hands), off(lElb), 0.052 * s + 2.2);
+      limb(c, off(tSh), off(hands), off(tElb), 0.05 * s + (MINI ? 0.8 : 2.2));
+      limb(c, off(lSh), off(hands), off(lElb), 0.052 * s + (MINI ? 0.8 : 2.2));
       c.strokeStyle = color;
     }
     limb(c, off(tSh), off(hands), off(tElb), 0.05 * s + e);
@@ -257,11 +313,11 @@
       // maila: metallinharmaa varsi ja tumma pää
       var ch = off(J.club), cd = J.cd, nx = -cd[1], ny = cd[0];
       c.strokeStyle = "#8E8A87";
-      limb(c, hw2, ch, null, Math.max(1.5, 0.010 * s));
+      limb(c, hw2, ch, null, Math.max(MINI ? 0.9 : 1.5, 0.010 * s) / TK);
       c.strokeStyle = "#7A7673";
       c.beginPath(); c.moveTo(ch[0], ch[1]);
       c.lineTo(ch[0] + nx * 0.05 * s + cd[0] * 0.012 * s, ch[1] + ny * 0.05 * s + cd[1] * 0.012 * s);
-      c.lineWidth = Math.max(2.5, 0.02 * s); c.stroke();
+      c.lineWidth = Math.max(MINI ? 1.6 : 2.5, 0.02 * s); c.stroke();
     }
     return { hands: hw2, belt: [off(tHip), off(lHip)], hip: off(hip) };
   }
@@ -282,10 +338,10 @@
     var info = drawGolfer(c, p, 0, 0, "#070707", 0, true);
     // vyö ja hanska: pienet punaiset korostukset
     c.lineCap = "round";
-    c.strokeStyle = "#D62839"; c.lineWidth = Math.max(1.5, 0.013 * s);
+    c.strokeStyle = "#D62839"; c.lineWidth = Math.max(MINI ? 1 : 1.5, 0.013 * s);
     c.beginPath(); c.moveTo(info.belt[0][0], info.belt[0][1] - 0.012 * s); c.lineTo(info.belt[1][0], info.belt[1][1] - 0.012 * s); c.stroke();
     c.fillStyle = "#E8394A";
-    c.beginPath(); c.arc(info.hands[0], info.hands[1], Math.max(2, 0.022 * s), 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(info.hands[0], info.hands[1], Math.max(MINI ? 1.3 : 2, 0.022 * s), 0, Math.PI * 2); c.fill();
   }
   function drawSwoosh(c, p) {
     if (p < 0.43 || p > 0.66) return;
@@ -297,7 +353,7 @@
     for (var k = 1; k < pts.length; k++) {
       var t = k / n;
       c.strokeStyle = "rgba(255," + Math.round(90 + 140 * t) + "," + Math.round(105 + 125 * t) + "," + (0.5 * t * fade).toFixed(3) + ")";
-      c.lineWidth = Math.max(1, 0.03 * L.s * t);
+      c.lineWidth = Math.max(MINI ? 0.6 : 1, 0.03 * L.s * t);
       c.beginPath(); c.moveTo(pts[k - 1][0], pts[k - 1][1]); c.lineTo(pts[k][0], pts[k][1]); c.stroke();
     }
   }
@@ -335,7 +391,7 @@
       if (y > o[1] + 0.02 * s) continue;
       var al2 = Math.pow(1 - lt, 1.1) * Math.min(1, lt * 20 + 0.2);
       c.fillStyle = P.tone > 0.9 ? "rgba(255,107,122," + al2.toFixed(3) + ")" : "rgba(" + Math.round(170 + P.tone * 50) + "," + Math.round(150 + P.tone * 40) + "," + Math.round(115 + P.tone * 30) + "," + al2.toFixed(3) + ")";
-      var z = P.sz * Math.max(1, s / 300);
+      var z = MINI ? Math.max(0.8, P.sz * 0.45) : P.sz * Math.max(1, s / 300);
       c.fillRect(x - z / 2, y - z / 2, z, z);
     }
   }
@@ -351,21 +407,21 @@
       return { pos: bez(f), f: f, r: 0 };
     }
     var v = clamp((p - FLY1) / (ROLL1 - FLY1), 0, 1), e = 1 - Math.pow(1 - v, 2.2);
-    var hop = Math.sin(Math.min(1, v * 2.2) * Math.PI) * 9 * (1 - v);
-    return { pos: [lerp(L.land[0], L.hole[0] - 9, e), L.land[1] - hop], f: 1, r: v };
+    var hop = Math.sin(Math.min(1, v * 2.2) * Math.PI) * (MINI ? 3 : 9) * (1 - v);
+    return { pos: [lerp(L.land[0], L.hole[0] - (MINI ? 3 : 9), e), L.land[1] - hop], f: 1, r: v };
   }
   function drawFlag(c, p) {
-    var poleH = L.s * (L.portrait ? 0.36 : 0.30);
+    var poleH = L.s * (MINI ? 0.5 : L.portrait ? 0.36 : 0.30);
     var x = L.hole[0], y = L.hole[1];
-    c.strokeStyle = "#BDB9B6"; c.lineWidth = 1.6; c.lineCap = "round";
+    c.strokeStyle = "#BDB9B6"; c.lineWidth = MINI ? 1 : 1.6; c.lineCap = "round";
     c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - poleH); c.stroke();
     var fw = poleH * 0.42, fh = poleH * 0.24, ph = p * 26;
     c.beginPath(); c.moveTo(x, y - poleH);
     for (var i = 1; i <= 8; i++) {
-      var t = i / 8; c.lineTo(x + fw * t, y - poleH + fh * 0.5 * t + Math.sin(ph + t * 4) * 3 * t);
+      var t = i / 8; c.lineTo(x + fw * t, y - poleH + fh * 0.5 * t + Math.sin(ph + t * 4) * (MINI ? 1 : 3) * t);
     }
     for (var j = 8; j >= 0; j--) {
-      var t2 = j / 8; c.lineTo(x + fw * t2, y - poleH + fh - fh * 0.5 * t2 + Math.sin(ph + t2 * 4) * 3 * t2);
+      var t2 = j / 8; c.lineTo(x + fw * t2, y - poleH + fh - fh * 0.5 * t2 + Math.sin(ph + t2 * 4) * (MINI ? 1 : 3) * t2);
     }
     c.closePath(); c.fillStyle = "#D62839"; c.fill();
   }
@@ -379,16 +435,16 @@
       var fade = p > ROLL1 ? 0.75 : 1;
       c.save();
       c.lineCap = "round"; c.lineJoin = "round";
-      c.shadowColor = "rgba(214,40,57,.9)"; c.shadowBlur = 14;
+      c.shadowColor = "rgba(214,40,57,.9)"; c.shadowBlur = MINI ? 4 : 14;
       for (var k = 1; k < pts.length; k++) {
         var t = k / (pts.length - 1);
         c.strokeStyle = "rgba(255," + Math.round(60 + 60 * t) + "," + Math.round(75 + 55 * t) + "," + (fade * (0.18 + 0.82 * t)).toFixed(3) + ")";
-        c.lineWidth = lerp(1.4, Math.max(3, 0.009 * s), t);
+        c.lineWidth = MINI ? lerp(0.6, 1.4, t) : lerp(1.4, Math.max(3, 0.009 * s), t);
         c.beginPath(); c.moveTo(pts[k - 1][0], pts[k - 1][1]); c.lineTo(pts[k][0], pts[k][1]); c.stroke();
       }
       c.restore();
     }
-    var r = Math.max(2.2, lerp(0.017 * s, 0.008 * s, b.f));
+    var r = MINI ? lerp(1.5, 1.1, b.f) : Math.max(2.2, lerp(0.017 * s, 0.008 * s, b.f));
     c.save();
     c.shadowColor = "rgba(255,255,255,.8)"; c.shadowBlur = b.f > 0 && b.f < 1 ? 10 : 4;
     c.fillStyle = "#fff";
@@ -396,17 +452,30 @@
     c.restore();
   }
 
-  function draw(p) {
-    if (!W || !H) return;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(bgCache, 0, 0);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawFlag(ctx, p);
-    drawSwoosh(ctx, p);
-    drawFigure(ctx, p);
-    drawBall(ctx, p);
-    drawSand(ctx, p);
+  /* ---------- näkymät: koko sivun tausta + mobiilin pieni versio ---------- */
+  var scenes = [
+    { el: layer, canvas: canvas, ctx: ctx, mini: false, W: 0, H: 0, dpr: 1, L: null, bg: null }
+  ];
+  if (miniCanvas && miniCanvas.getContext) {
+    var mctx = miniCanvas.getContext("2d");
+    if (mctx) scenes.push({ el: miniCanvas, canvas: miniCanvas, ctx: mctx, mini: true, W: 0, H: 0, dpr: 1, L: null, bg: null });
   }
+  function use(sc) { W = sc.W; H = sc.H; dpr = sc.dpr; L = sc.L; bgCache = sc.bg; MINI = sc.mini; TK = sc.mini ? 1.45 : 1; }
+  function drawScene(sc, p) {
+    if (!sc.W || !sc.H || !sc.bg) return;
+    use(sc);
+    var c = sc.ctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, sc.canvas.width, sc.canvas.height);
+    c.drawImage(sc.bg, 0, 0);
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawFlag(c, p);
+    drawSwoosh(c, p);
+    drawFigure(c, p);
+    drawBall(c, p);
+    drawSand(c, p);
+  }
+  function draw(p) { for (var i = 0; i < scenes.length; i++) drawScene(scenes[i], p); }
 
   /* ---------- vieritys, koko ja liikkeen vähennys ---------- */
   function reduced() { return !!(reduceMq && reduceMq.matches); }
@@ -415,7 +484,7 @@
     if (range < 120) return STATIC_P;                 // lyhyt sivu: pysäytyskuva
     return clamp((window.pageYOffset || doc.scrollTop) / range, 0, 1);
   }
-  function tick() {
+  function tick() {                                   // yksi yhteinen rAF-silmukka molemmille näkymille
     raf = 0;
     var d = target - cur;
     cur = Math.abs(d) < 0.0006 ? target : cur + d * 0.2;
@@ -427,30 +496,35 @@
     target = progress();
     if (!raf) raf = requestAnimationFrame(tick);
   }
-  function resize() {
-    var rect = layer.getBoundingClientRect();
+  function sizeScene(sc, force) {
+    var rect = sc.el.getBoundingClientRect();
     var w = Math.round(rect.width), h = Math.round(rect.height);
-    if (!w || !h) return;
-    var nd = Math.min(2, window.devicePixelRatio || 1);
-    if (w === W && h === H && nd === dpr && bgCache) return;
-    W = w; H = h; dpr = nd;
-    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-    L = layout(); buildBg();
-    if (reduced()) { cur = target = STATIC_P; draw(STATIC_P); return; }
-    target = progress(); cur = target; draw(cur);
+    if (!w || !h) { sc.W = sc.H = 0; return false; }   // piilossa (esim. pieni versio työpöydällä)
+    var nd = Math.min(sc.mini ? 3 : 2, window.devicePixelRatio || 1);
+    if (!force && w === sc.W && h === sc.H && nd === sc.dpr && sc.bg) return false;
+    sc.W = W = w; sc.H = H = h; sc.dpr = dpr = nd; MINI = sc.mini;
+    sc.canvas.width = Math.round(w * nd); sc.canvas.height = Math.round(h * nd);
+    if (sc.mini) { sc.L = L = layoutMini(); buildBgMini(); }
+    else { sc.L = L = layout(); buildBg(); }
+    sc.bg = bgCache;
+    return true;
+  }
+  function resize(force) {
+    for (var i = 0; i < scenes.length; i++) sizeScene(scenes[i], force);
+    if (reduced()) { cur = target = STATIC_P; }
+    else { target = progress(); cur = target; }
+    draw(cur);
   }
   var rz = 0;
-  function onResize() { if (rz) cancelAnimationFrame(rz); rz = requestAnimationFrame(function () { rz = 0; resize(); onScroll(); }); }
+  function onResize() { if (rz) cancelAnimationFrame(rz); rz = requestAnimationFrame(function () { rz = 0; resize(false); onScroll(); }); }
 
   window.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener("resize", onResize);
   window.addEventListener("load", onResize);
   if (reduceMq) {
-    var mqh = function () { W = 0; resize(); };
+    var mqh = function () { resize(true); };
     if (reduceMq.addEventListener) reduceMq.addEventListener("change", mqh); else if (reduceMq.addListener) reduceMq.addListener(mqh);
   }
-  // testausta varten: ?bgp=0.5 lukitsee kuvan tiettyyn kohtaan
-  var m = /[?&]bgp=([0-9.]+)/.exec(location.search);
-  if (m) { var fixed = clamp(parseFloat(m[1]), 0, 1); progress = function () { return fixed; }; }
-  resize();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(onResize);
+  resize(true);
 })();

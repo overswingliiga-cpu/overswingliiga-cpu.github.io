@@ -206,6 +206,22 @@ header.hero h1 {
   background: #000;
 }
 .golf-bg canvas { display: block; width: 100%; height: 100%; }
+.golf-mini { display: none; }
+@media (max-width: 760px) {
+  .golf-mini {
+    display: block;
+    flex: 0 1 120px;
+    min-width: 56px;
+    height: 48px;
+    margin: 0 auto 0 .35rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #0a0909;
+  }
+  .topbar-inner .sitenav { flex-wrap: nowrap; flex-shrink: 0; }
+  .topbar-inner .topbar-logo { flex-shrink: 0; }
+}
+@media (max-width: 359px) { .golf-mini { display: none; } .topbar-inner .sitenav { flex-wrap: wrap; flex-shrink: 1; } }
 header.hero h1, .kicker, .subtitle, .cta-note { text-shadow: 0 2px 14px rgba(0, 0, 0, .85); }
 
 /* Sisältö */
